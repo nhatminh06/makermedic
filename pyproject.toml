@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "makermedic"
+dynamic = ["version"]
+description = "Evidence-based diagnostics for Linux AI, robotics, and maker environments"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+dependencies = [
+    "nvidia-ml-py>=12,<14",
+    "psutil>=6,<8",
+    "pydantic>=2.7,<3",
+    "pyserial>=3.5,<4",
+    "rich>=13.7,<15",
+    "typer>=0.12,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2,<9",
+    "ruff>=0.5,<1",
+]
+
+[project.scripts]
+makermedic = "makermedic.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/makermedic"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/README.md",
+    "/LICENSE",
+    "/pyproject.toml",
+]
+
+[tool.hatch.version]
+path = "src/makermedic/__init__.py"
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
