@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from unittest.mock import patch
 
@@ -11,6 +12,12 @@ from makermedic.core.models import DiagnosticStatus
 from makermedic.core.registry import Registry
 
 runner = CliRunner()
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+
+
+def error_text(result) -> str:
+    """Normalize Rich/Click styling so assertions are terminal-independent."""
+    return ANSI_ESCAPE.sub("", result.stderr)
 
 
 def registry_with_status(status: DiagnosticStatus) -> Registry:
@@ -63,7 +70,7 @@ def test_lab_show_and_run_json() -> None:
 def test_lab_unknown_scenario_is_usage_error() -> None:
     result = runner.invoke(app, ["lab", "run", "missing-scenario"])
     assert result.exit_code == 2
-    assert "unknown lab scenario" in result.stderr
+    assert "unknown lab scenario" in error_text(result)
 
 
 def test_bundle_requires_exactly_one_mode() -> None:
@@ -116,7 +123,7 @@ def test_bundle_snapshot_rejects_live_options(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 2
-    assert "cannot be combined" in result.stderr
+    assert "cannot be combined" in error_text(result)
 
 
 def test_bundle_service_requires_local_url() -> None:
@@ -131,7 +138,7 @@ def test_bundle_invalid_snapshot_is_usage_error(tmp_path: Path) -> None:
     invalid.write_text('{"schema_version": 999}', encoding="utf-8")
     result = runner.invoke(app, ["bundle", "--snapshot", str(invalid), "--preview"])
     assert result.exit_code == 2
-    assert "unsupported snapshot schema" in result.stderr
+    assert "unsupported snapshot schema" in error_text(result)
     assert (
         runner.invoke(
             app,
@@ -210,7 +217,7 @@ def test_cli_unknown_category_is_usage_error() -> None:
     result = runner.invoke(app, ["diagnose", "--category", "missing"])
 
     assert result.exit_code == 2
-    assert "unknown diagnostic category" in result.stderr
+    assert "unknown diagnostic category" in error_text(result)
 
 
 @pytest.mark.parametrize(
@@ -279,8 +286,8 @@ def test_usb_serial_category_exit_semantics(
 def test_serial_open_option_requires_serial_category() -> None:
     result = runner.invoke(app, ["diagnose", "--category", "usb", "--serial-open-test"])
     assert result.exit_code == 2
-    assert "serial open testing requires" in result.stderr
-    assert "--category serial" in result.stderr
+    assert "serial open testing requires" in error_text(result)
+    assert "--category serial" in error_text(result)
 
 
 def test_serial_open_option_is_forwarded(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -303,7 +310,7 @@ def test_serial_open_option_is_forwarded(monkeypatch: pytest.MonkeyPatch) -> Non
 def test_service_requires_url() -> None:
     result = runner.invoke(app, ["diagnose", "--category", "service"])
     assert result.exit_code == 2
-    assert "require --url" in result.stderr
+    assert "require --url" in error_text(result)
 
 
 @pytest.mark.parametrize("url", ["not-a-url", "ftp://localhost", "http://example.com"])
@@ -315,7 +322,7 @@ def test_service_rejects_invalid_or_external_url(url: str) -> None:
 def test_url_requires_explicit_service_category() -> None:
     result = runner.invoke(app, ["diagnose", "--url", "http://localhost:8000"])
     assert result.exit_code == 2
-    assert "--category service" in result.stderr
+    assert "--category service" in error_text(result)
 
 
 @pytest.mark.parametrize(
@@ -380,14 +387,14 @@ def test_diagnose_save_round_trip_and_refuses_overwrite(
     assert "Snapshot saved" in first.stdout
     assert json.loads(path.read_text())["schema_version"] == 1
     assert second.exit_code == 2
-    assert "already exists" in second.stderr
+    assert "already exists" in error_text(second)
     assert forced.exit_code == 0
 
 
 def test_force_requires_save() -> None:
     result = runner.invoke(app, ["diagnose", "--force"])
     assert result.exit_code == 2
-    assert "requires --save" in result.stderr
+    assert "requires --save" in error_text(result)
 
 
 def _write_cli_snapshot(path: Path, status: str) -> None:
